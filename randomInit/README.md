@@ -1,5 +1,5 @@
-# Random Pegasus Model
-A randomly initialized Pegasus model, trained for 1 epoch.
+# Base Pegasus Model
+A randomly initialized Pegasus model, without pretraining, trained for 1 epoch.
 
 # Wandb:
 This run can be seen here: https://wandb.ai/glemasurier/PegasusSummarization/runs/1eiapfws?workspace=user-glemasurier

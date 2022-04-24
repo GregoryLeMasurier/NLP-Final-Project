@@ -1,40 +1,20 @@
-# %% [markdown]
 # Final Project - Gregory LeMasurier and Mojtaba Talaei Khoei
-# 
-# Making the training file a jupyter notebook for the time being so I can easily debug it.
 
-# %%
-# Install Dependencies
-import sys
-#!{sys.executable} -m pip install rouge-score nltk sentencepiece
+# Dependencies: pip install rouge-score nltk sentencepiece
 
-# %%
-# Common Imports
 import os
 import random
-
 import transformers
 from transformers import PegasusTokenizer, PegasusConfig
 from transformers import PegasusForConditionalGeneration
-
 import datasets
 from datasets import load_dataset
-
 import torch
 from torch.utils.data import DataLoader
-
 import wandb
 from packaging import version
 from tqdm.auto import tqdm
-
 from copy import deepcopy
-
-
-#%load_ext autoreload
-#%autoreload 2
-
-# %%
-# Setup logging
 import logging
 
 logger = logging.getLogger("Summarization")
@@ -57,11 +37,8 @@ def sample_small_debug_dataset(raw_datasets):
 datasets.utils.logging.set_verbosity_warning()
 transformers.utils.logging.set_verbosity_warning()
 
-# %%
-# ROUGE Metric
 rouge = datasets.load_metric("rouge")
 
-# %%
 cpu_only = False
 
 dataset_name = 'cnn_dailymail'
@@ -86,11 +63,11 @@ lr_scheduler_type = "linear"
 num_warmup_steps = 0
 eval_every_steps = 20000
 k = int(seq_len * 0.3)
+accum_iter = 4  
 
-# Flag to make 
+# Flag to use smaller sample 
 debug = False
 
-# %%
 def main():
     logger.info(f"Starting tokenizer training")
 
@@ -104,7 +81,7 @@ def main():
 
     # Make a small dataset for proof of concept
     if debug:
-        raw_datasets = utils.sample_small_debug_dataset(raw_datasets)
+        raw_datasets = sample_small_debug_dataset(raw_datasets)
 
     ## TOKENIZER
     tokenizer = PegasusTokenizer.from_pretrained(tokenizer_name)
@@ -113,12 +90,6 @@ def main():
     #The pegasus model is too large to test on a laptop, so load a small config for now
     #model = PegasusForConditionalGeneration.from_pretrained(model_name).to(device)
     config = PegasusConfig(
-            #encoder_layers=2, 
-            #decoder_layers=2, 
-            #encoder_attention_heads=8, 
-            #decoder_attention_heads=8, 
-            #decoder_ffn_dim=1024, 
-            #encoder_ffn_dim=1024,
             max_position_embeddings=seq_len,
             vocab_size=tokenizer.vocab_size
             )
@@ -201,6 +172,7 @@ def main():
     global_step = 0
     for epoch in range(num_train_epochs):
         model.train()
+        batch_index = 0
         for batch in train_dataloader:
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
@@ -216,13 +188,16 @@ def main():
             res = torch.topk(logits, k=k)
             values = res[0]
 
-            loss.backward()
-            optimizer.step()
+            loss.backward()            
             lr_scheduler.step()
-            optimizer.zero_grad()
+
+            if ((batch_index + 1) % accum_iter == 0) or (batch_index + 1 == len(train_dataloader)):
+                optimizer.step()
+                optimizer.zero_grad()
 
             progress_bar.update(1)
             global_step += 1
+            batch_index += 1
 
             wandb.log(
                 {
@@ -243,9 +218,6 @@ def main():
                     eval_labels.append(batch["labels"].to(device))
                     encoded_summary = model.generate(eval_input_ids)
                     generations.append(encoded_summary)
-                    #print(generations)
-                    #decodings = tokenizer.batch_decode(encoded_summary, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-                    #print("Decoding: " + str(decodings))
 
                 rouge_score = rouge.compute(predictions=generations, references=eval_labels)
 
@@ -274,8 +246,6 @@ def main():
         decoded_summaries = tokenizer.batch_decode(test_encoded_summary, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         print("Summary: " + str(decoded_summaries))
         
-
-# %%
 if __name__ == "__main__" :
     if version.parse(datasets.__version__) < version.parse("1.18.0"):
         raise RuntimeError("This script requires Datasets 1.18.0 or higher. Please update via pip install -U datasets.")

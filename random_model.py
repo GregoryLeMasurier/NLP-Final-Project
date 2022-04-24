@@ -62,13 +62,15 @@ transformers.utils.logging.set_verbosity_warning()
 rouge = datasets.load_metric("rouge")
 
 # %%
-cpu_only = True
+cpu_only = False
 
 dataset_name = 'cnn_dailymail'
 dataset_version = '3.0.0'
 wandb_project = "PegasusSummarization"
 output_dir = "output_dir/"
 device = 'cuda' if (torch.cuda.is_available() and not cpu_only) else 'cpu'
+
+print("DEVICE: " + str(device) + "\n\n")
 
 if torch.cuda.is_available:
     torch.cuda.empty_cache()
@@ -79,10 +81,10 @@ seq_len = 1024
 batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
-num_train_epochs = 10
+num_train_epochs = 2
 lr_scheduler_type = "linear"
 num_warmup_steps = 0
-eval_every_steps = 2000
+eval_every_steps = 20000
 k = int(seq_len * 0.3)
 
 # Flag to make 
@@ -111,12 +113,12 @@ def main():
     #The pegasus model is too large to test on a laptop, so load a small config for now
     #model = PegasusForConditionalGeneration.from_pretrained(model_name).to(device)
     config = PegasusConfig(
-            encoder_layers=2, 
-            decoder_layers=2, 
-            encoder_attention_heads=8, 
-            decoder_attention_heads=8, 
-            decoder_ffn_dim=1024, 
-            encoder_ffn_dim=1024,
+            #encoder_layers=2, 
+            #decoder_layers=2, 
+            #encoder_attention_heads=8, 
+            #decoder_attention_heads=8, 
+            #decoder_ffn_dim=1024, 
+            #encoder_ffn_dim=1024,
             max_position_embeddings=seq_len,
             vocab_size=tokenizer.vocab_size
             )

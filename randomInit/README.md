@@ -1,10 +1,10 @@
-#Random Pegasus Model
+# Random Pegasus Model
 A randomly initialized Pegasus model, trained for 1 epoch.
 
-#Wandb
+# Wandb:
 This run can be seen here: https://wandb.ai/glemasurier/PegasusSummarization/runs/1eiapfws?workspace=user-glemasurier
 
-#Examples of generated summaries:  
+# Examples of generated summaries:  
 Summary: ['The new-year-old was found in the hospital in the hospital . The couple', 'The newyear-old was found in the hospital of a car in the hospital .', 'The new-year-old was found in the hospital of a wife in the hospital ', 'The ne
 wyear-old man was found in a home of the hospital . The couple', 'The new-year-old was found dead in the hospital of the car . The', 'The newyear-old was found dead in the hospital in the hospital . The mother', 'The newyear-old was foun
 d in a home of a car in the home .', 'The new-year-old was a first-year-old girl in the world ']

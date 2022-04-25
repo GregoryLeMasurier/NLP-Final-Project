@@ -6,12 +6,14 @@ import os
 import random
 import transformers
 from transformers import PegasusTokenizer, PegasusConfig
-from transformers import PegasusForConditionalGeneration, Seq2SeqLMOutput
+from transformers import PegasusForConditionalGeneration
+from transformers.modeling_outputs import Seq2SeqLMOutput
 import datasets
 from datasets import load_dataset
 import torch
 from torch.utils.data import DataLoader
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
 import wandb
 from packaging import version
@@ -43,7 +45,7 @@ rouge = datasets.load_metric("rouge")
 
 cpu_only = False
 
-dataset_name = 'cnn_dailymail'
+dataset_name = 'ccdv/cnn_dailymail'
 dataset_version = '3.0.0'
 wandb_project = "PegasusSummarization"
 output_dir = "output_dir/"
@@ -54,10 +56,10 @@ print("DEVICE: " + str(device) + "\n\n")
 if torch.cuda.is_available:
     torch.cuda.empty_cache()
 
-model_name = 'google/pegasus-xsum' 
+model_name = 'google/pegasus-xsum'
 tokenizer_name = 'google/pegasus-xsum' #'google/pegasus-cnn_dailymail'
-seq_len = 512
-batch_size = 8
+seq_len = 256
+batch_size = 4
 learning_rate = 5e-5
 weight_decay = 0.0
 num_train_epochs = 1
@@ -65,10 +67,10 @@ lr_scheduler_type = "linear"
 num_warmup_steps = 0
 eval_every_steps = 10000
 k = int(seq_len * 0.3)
-accum_iter = 4  
+accum_iter = 8
 #out_dim = 4096
 
-# Flag to use smaller sample 
+# Flag to use smaller sample
 debug = True
 
 
@@ -78,15 +80,26 @@ class PegasusForSummarization(nn.Module):
         self.pretrained_model = pretrained_model
         self.dropout = nn.Dropout(dropout_prob)
         self.output_layer = nn.Linear(pretrained_model.config.hidden_size, num_tokens)
-        
+
     def forward(self, input_ids, attention_mask, labels):
         x = self.pretrained_model(input_ids, attention_mask, labels)
-        x = x.last_hidden_state[:, 0, :]
+        #print("DECODER" + str(x.decoder_hidden_states))
+        #print("ENCODER" + str(x.encoder_hidden_states))
+        x = x.decoder_hidden_states[-1][:, 0, :]
         x = self.dropout(x)
         logits = self.output_layer(x)
 
+        print(logits.shape)
+        print(labels.shape)
+
+        print("\n")
+        print(logits.view(-1, self.pretrained_model.config.vocab_size).shape)
+        print(labels.shape)
+        print("\n")
+        print("\n")
+
         loss_fct = CrossEntropyLoss()
-        masked_lm_loss = loss_fct(logits.view(-1, self.pretrained_model.config.vocab_size), labels.view(-1))
+        masked_lm_loss = loss_fct(logits.view(-1, self.pretrained_model.config.vocab_size), labels)
         return Seq2SeqLMOutput(
             loss=masked_lm_loss,
             logits=logits,
@@ -161,21 +174,21 @@ def main():
     collator = transformers.DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, max_length=seq_len, padding='max_length', label_pad_token_id=0)
 
     train_dataloader = DataLoader(
-        train_dataset, 
-        shuffle=True, 
-        collate_fn=collator, 
+        train_dataset,
+        shuffle=True,
+        collate_fn=collator,
         batch_size=batch_size
     )
-    
+
     eval_dataloader = DataLoader(
-        eval_dataset, 
-        collate_fn=collator, 
+        eval_dataset,
+        collate_fn=collator,
         batch_size=batch_size
     )
 
     test_dataloader = DataLoader(
-        test_dataset, 
-        collate_fn=collator, 
+        test_dataset,
+        collate_fn=collator,
         batch_size=batch_size
     )
     optimizer = torch.optim.AdamW(
@@ -183,7 +196,7 @@ def main():
         lr=learning_rate,
         weight_decay=weight_decay,
     )
-    
+
     num_update_steps_per_epoch = len(train_dataloader)
     max_train_steps = num_train_epochs * num_update_steps_per_epoch
 
@@ -221,7 +234,7 @@ def main():
             res = torch.topk(logits, k=k)
             values = res[0]
 
-            loss.backward()            
+            loss.backward()
             lr_scheduler.step()
 
             if ((batch_index + 1) % accum_iter == 0) or (batch_index + 1 == len(train_dataloader)):
@@ -278,7 +291,7 @@ def main():
         summaries.append(test_encoded_summary)
         decoded_summaries = tokenizer.batch_decode(test_encoded_summary, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         print("Summary: " + str(decoded_summaries))
-        
+
 if __name__ == "__main__" :
     if version.parse(datasets.__version__) < version.parse("1.18.0"):
         raise RuntimeError("This script requires Datasets 1.18.0 or higher. Please update via pip install -U datasets.")

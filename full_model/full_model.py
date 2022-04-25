@@ -6,12 +6,13 @@ import os
 import random
 import transformers
 from transformers import PegasusTokenizer, PegasusConfig
-from transformers import PegasusForConditionalGeneration
+from transformers import PegasusForConditionalGeneration, Seq2SeqLMOutput
 import datasets
 from datasets import load_dataset
 import torch
 from torch.utils.data import DataLoader
 import torch.nn as nn
+from torch.nn import CrossEntropyLoss
 import wandb
 from packaging import version
 from tqdm.auto import tqdm
@@ -77,18 +78,26 @@ class PegasusForSummarization(nn.Module):
         self.pretrained_model = pretrained_model
         self.dropout = nn.Dropout(dropout_prob)
         self.output_layer = nn.Linear(pretrained_model.config.hidden_size, num_tokens)
-#        self.output_layer2 = nn.Linear(out_dim, pretrained_model.config.hidden_size)
         
     def forward(self, input_ids, attention_mask, labels):
         x = self.pretrained_model(input_ids, attention_mask, labels)
-        #print(x)
-        print("DECODER" + str(x.decoder_hidden_states))
-        print("ENCODER" + str(x.encoder_hidden_states))
-        x = x.decoder_hidden_states[-1][:, 0, :]
+        x = x.last_hidden_state[:, 0, :]
         x = self.dropout(x)
         logits = self.output_layer(x)
-#        logits = self.output_layer2(x)
-        return logits
+
+        loss_fct = CrossEntropyLoss()
+        masked_lm_loss = loss_fct(logits.view(-1, self.pretrained_model.config.vocab_size), labels.view(-1))
+        return Seq2SeqLMOutput(
+            loss=masked_lm_loss,
+            logits=logits,
+            past_key_values=None,
+            decoder_hidden_states=None,
+            decoder_attentions=None,
+            cross_attentions=None,
+            encoder_last_hidden_state=None,
+            encoder_hidden_states=None,
+            encoder_attentions=None,
+        )
 
 
 

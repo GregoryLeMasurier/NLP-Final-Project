@@ -74,18 +74,19 @@ accum_iter = 8
 debug = True
 
 
+##BELOW IS NOT USED ANYMORE - CAN BE USED TO INVESTIGATE FREEZING THE MODEL IF WE HAVE TIME
 class PegasusForSummarization(nn.Module):
-    def __init__(self, pretrained_model, num_tokens, dropout_prob=0.5):
+    def __init__(self, pretrained_model, dropout_prob=0.5):
         super().__init__()
         self.pretrained_model = pretrained_model
         self.dropout = nn.Dropout(dropout_prob)
-        self.output_layer = nn.Linear(pretrained_model.config.hidden_size, num_tokens)
+        self.output_layer = nn.Linear(pretrained_model.config.hidden_size, self.pretrained_model.config.vocab_size)
 
     def forward(self, input_ids, attention_mask, labels):
         x = self.pretrained_model(input_ids, attention_mask, labels)
         #print("DECODER" + str(x.decoder_hidden_states))
         #print("ENCODER" + str(x.encoder_hidden_states))
-        x = x.decoder_hidden_states[-1][:, 0, :]
+        x = x.decoder_hidden_states[-1] #[:, 0, :]
         x = self.dropout(x)
         logits = self.output_layer(x)
 
@@ -133,12 +134,11 @@ def main():
     tokenizer = PegasusTokenizer.from_pretrained(tokenizer_name)
     #print("Tokenizer Size: " + str(tokenizer.vocab_size))
     ## PRETRAINED MODEL
-    #The pegasus model is too large to test on a laptop, so load a small config for now
     config = PegasusConfig.from_pretrained(model_name, output_hidden_states=True)
-    pegasus_model = PegasusForConditionalGeneration.from_pretrained(model_name, config=config).to(device)
+    model = PegasusForConditionalGeneration.from_pretrained(model_name, config=config).to(device)
     #print("Pegasus Model Size: " + str(pegasus_model))
-    model = PegasusForSummarization(pretrained_model=pegasus_model, num_tokens=tokenizer.vocab_size).to(device)
-    print("Custom Pegasus Model Size: " + str(pegasus_model))
+    #model = PegasusForSummarization(pretrained_model=pegasus_model).to(device)
+    print("Custom Pegasus Model Size: " + str(model))
 
 
     column_names = raw_datasets["train"].column_names

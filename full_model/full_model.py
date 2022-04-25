@@ -106,13 +106,13 @@ def main():
 
     ## TOKENIZER
     tokenizer = PegasusTokenizer.from_pretrained(tokenizer_name)
-    print("Tokenizer Size: " + str(tokenizer.vocab_size))
+    #print("Tokenizer Size: " + str(tokenizer.vocab_size))
     ## PRETRAINED MODEL
     #The pegasus model is too large to test on a laptop, so load a small config for now
     pegasus_model = PegasusForConditionalGeneration.from_pretrained(model_name).to(device)
-    print("Pegasus Model Size: " + str(pegasus_model))
+    #print("Pegasus Model Size: " + str(pegasus_model))
     model = PegasusForSummarization(pretrained_model=pegasus_model, num_tokens=tokenizer.vocab_size)
-    print("Custom Pegasus Model Size: " + str(pegasus_model))
+    #print("Custom Pegasus Model Size: " + str(pegasus_model))
 
 
     column_names = raw_datasets["train"].column_names

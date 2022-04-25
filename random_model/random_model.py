@@ -115,19 +115,26 @@ def main():
         load_from_cache_file=True,
         desc="Tokenizing the dataset",
     )
-
+    train_dataset = tokenized_datasets["train"]
     eval_dataset = tokenized_datasets["validation"] if "validaion" in tokenized_datasets else tokenized_datasets["test"]
     test_dataset = tokenized_datasets["test"]
 
 
-    for index in random.sample(range(len(train_dataset)), 2):
-        logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
-        logger.info(f"Sample {index} of the training set input ids: {train_dataset[index]['input_ids']}.")
-        logger.info(f"Decoded input_ids: {tokenizer.decode(train_dataset[index]['input_ids'])}")
-        logger.info(f"Decoded labels: {tokenizer.decode(train_dataset[index]['labels'])}")
-        logger.info("\n")
+    #for index in random.sample(range(len(train_dataset)), 2):
+        #logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+        #logger.info(f"Sample {index} of the training set input ids: {train_dataset[index]['input_ids']}.")
+        #logger.info(f"Decoded input_ids: {tokenizer.decode(train_dataset[index]['input_ids'])}")
+        #logger.info(f"Decoded labels: {tokenizer.decode(train_dataset[index]['labels'])}")
+        #logger.info("\n")
 
     collator = transformers.DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, max_length=seq_len, padding='max_length', label_pad_token_id=0)
+
+    train_dataloader = DataLoader(
+        train_dataset,
+        shuffle=True,
+        collate_fn=collator,
+        batch_size=batch_size
+    )
 
     eval_dataloader = DataLoader(
         eval_dataset,
@@ -162,7 +169,7 @@ def main():
     logger.info(f"  Total optimization steps = {max_train_steps}")
     progress_bar = tqdm(range(max_train_steps))
 
-    batch = next(iter(train_dataloader))
+    #batch = next(iter(train_dataloader))
 
     global_step = 0
     model.eval()

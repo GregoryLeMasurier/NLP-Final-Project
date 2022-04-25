@@ -62,7 +62,7 @@ seq_len = 512
 batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
-num_train_epochs = 1
+num_train_epochs = 3
 lr_scheduler_type = "linear"
 num_warmup_steps = 0
 eval_every_steps = 10000
@@ -235,11 +235,12 @@ def main():
             values = res[0]
 
             loss.backward()
-            lr_scheduler.step()
 
             if ((batch_index + 1) % accum_iter == 0) or (batch_index + 1 == len(train_dataloader)):
                 optimizer.step()
                 optimizer.zero_grad()
+
+            lr_scheduler.step()
 
             progress_bar.update(1)
             global_step += 1

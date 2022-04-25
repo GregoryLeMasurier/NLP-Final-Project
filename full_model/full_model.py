@@ -42,7 +42,7 @@ rouge = datasets.load_metric("rouge")
 
 cpu_only = False
 
-dataset_name = 'cnn_dailymail'
+dataset_name = 'ccdv/cnn_dailymail'
 dataset_version = '3.0.0'
 wandb_project = "PegasusSummarization"
 output_dir = "output_dir/"
@@ -54,8 +54,8 @@ if torch.cuda.is_available:
     torch.cuda.empty_cache()
 
 model_name = 'google/pegasus-xsum' 
-tokenizer_name = 'google/pegasus-cnn_dailymail'
-seq_len = 1024
+tokenizer_name = 'google/pegasus-xsum' #'google/pegasus-cnn_dailymail'
+seq_len = 512
 batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
@@ -65,23 +65,26 @@ num_warmup_steps = 0
 eval_every_steps = 20000
 k = int(seq_len * 0.3)
 accum_iter = 4  
+#out_dim = 4096
 
 # Flag to use smaller sample 
-debug = False
+debug = True
 
 
 class PegasusForSummarization(nn.Module):
-    def __init__(self, pre_trained_model, num_tokens, dropout_prob=0.5):
+    def __init__(self, pretrained_model, num_tokens, dropout_prob=0.5):
         super().__init__()
-        self.pre_trained_model = pre_trained_model
+        self.pretrained_model = pretrained_model
         self.dropout = nn.Dropout(dropout_prob)
-        self.output_layer = nn.Linear(pre_trained_model.config.hidden_size, num_tokens)
+        self.output_layer = nn.Linear(pretrained_model.config.hidden_size, num_tokens)
+#        self.output_layer2 = nn.Linear(out_dim, pretrained_model.config.hidden_size)
         
     def forward(self, input_ids, attention_mask, labels):
-        x = self.pre_trained_model(input_ids, attention_mask, labels)
+        x = self.pretrained_model(input_ids, attention_mask, labels)
         x = x.last_hidden_state[:, 0, :]
         x = self.dropout(x)
         logits = self.output_layer(x)
+#        logits = self.output_layer2(x)
         return logits
 
 
@@ -109,6 +112,7 @@ def main():
     pegasus_model = PegasusForConditionalGeneration.from_pretrained(model_name).to(device)
     print("Pegasus Model Size: " + str(pegasus_model))
     model = PegasusForSummarization(pretrained_model=pegasus_model, num_tokens=tokenizer.vocab_size)
+    print("Custom Pegasus Model Size: " + str(pegasus_model))
 
 
     column_names = raw_datasets["train"].column_names

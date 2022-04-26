@@ -62,7 +62,7 @@ seq_len = 512
 batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
-num_train_epochs = 3
+num_train_epochs = 2
 lr_scheduler_type = "linear"
 num_warmup_steps = 0
 eval_every_steps = 10000
@@ -134,8 +134,8 @@ def main():
     tokenizer = PegasusTokenizer.from_pretrained(tokenizer_name)
     #print("Tokenizer Size: " + str(tokenizer.vocab_size))
     ## PRETRAINED MODEL
-    config = PegasusConfig.from_pretrained(model_name, output_hidden_states=True)
-    model = PegasusForConditionalGeneration.from_pretrained(model_name, config=config).to(device)
+    #config = PegasusConfig.from_pretrained(model_name, output_hidden_states=True)
+    model = PegasusForConditionalGeneration.from_pretrained(model_name).to(device)
     #print("Pegasus Model Size: " + str(pegasus_model))
     #model = PegasusForSummarization(pretrained_model=pegasus_model).to(device)
     print("Custom Pegasus Model Size: " + str(model))
@@ -186,11 +186,6 @@ def main():
         batch_size=batch_size
     )
 
-    test_dataloader = DataLoader(
-        test_dataset,
-        collate_fn=collator,
-        batch_size=batch_size
-    )
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=learning_rate,
@@ -213,7 +208,7 @@ def main():
     logger.info(f"  Total optimization steps = {max_train_steps}")
     progress_bar = tqdm(range(max_train_steps))
 
-    batch = next(iter(train_dataloader))
+    #batch = next(iter(train_dataloader))
 
     global_step = 0
     for epoch in range(num_train_epochs):
@@ -283,6 +278,13 @@ def main():
 
             if global_step >= max_train_steps:
                 break
+
+    test_dataloader = DataLoader(
+        test_dataset,
+        collate_fn=collator,
+        batch_size=batch_size
+    )
+
     summaries = []
     test_labels = []
     for batch in test_dataloader:

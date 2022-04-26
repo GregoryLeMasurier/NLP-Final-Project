@@ -1,3 +1,10 @@
+# Full Pegasus Model
+A pretrained Pegasus model trained for 2 epochs.
+
+# Wandb:
+This run can be seen here: https://wandb.ai/glemasurier/PegasusSummarization/runs/3rv7kpzi?workspace=user-glemasurier
+
+# Examples of generated summaries:  
 Summary: ['Genes for Good is a Facebook app designed to survey the health of millions of social network users, who can also send in spit samples to tie their survey results to their genes . It was set up by biostatisticians from the Univ
 ersity of Michigan and is available over 18s in the US .', 'Ronald Peijenburg, owner of the De Zwann restaurant in Etten-Leur, has previously used a Formula 1 racing car, hot air balloon and a helicopter to deliver the first crop of the 
 seasonal vegetable . But the drone, which had a metal can attached containing several asparagus stalks, crashed', 'Aston Villa face Tottenham Hotspur in the FA Cup final on Tuesday . Tim Sherwood, Chris Ramsey and Les Ferdinand worked to

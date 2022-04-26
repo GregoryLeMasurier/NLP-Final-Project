@@ -131,7 +131,7 @@ def main():
 
     logger.info(f"Loading dataset")
 
-    wandb.init(project=wandb_project) #Skipping config for now - will add back later
+    run = wandb.init(project=wandb_project) #Skipping config for now - will add back later
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -308,6 +308,7 @@ def main():
         summaries.append(test_encoded_summary)
         decoded_summaries = tokenizer.batch_decode(test_encoded_summary, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         print("Summary: " + str(decoded_summaries))
+    run.finish()  # stop wandb run
 
 if __name__ == "__main__" :
     if version.parse(datasets.__version__) < version.parse("1.18.0"):

@@ -41,12 +41,9 @@ def sample_small_debug_dataset(raw_datasets):
 def sample_small_eval_dataset(raw_datasets):
     val_random_indices = random.sample(list(range(len(raw_datasets["validation"]))), 3000)
     val_subset = raw_datasets["validation"].select(val_random_indices)
-    test_random_indices = random.sample(list(range(len(raw_datasets["test"]))), 3000)
-    test_subset = raw_datasets["test"].select(test_random_indices)
     if "validation" in raw_datasets:
         raw_datasets["validation"] = deepcopy(val_subset)
-    if "test" in raw_datasets:
-        raw_datasets["test"] = deepcopy(test_subset)
+   
     return raw_datasets
 
 datasets.utils.logging.set_verbosity_warning()

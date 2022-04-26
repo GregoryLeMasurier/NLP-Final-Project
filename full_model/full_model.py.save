@@ -39,10 +39,10 @@ def sample_small_debug_dataset(raw_datasets):
     return raw_datasets
 
 def sample_small_eval_dataset(raw_datasets):
-    val_random_indices = random.sample(list(range(len(raw_datasets["validation"]))), 3000)
-    val_subset = raw_datasets["validation"].select(val_random_indices)
-    test_random_indices = random.sample(list(range(len(raw_datasets["test"]))), 3000)
-    test_subset = raw_datasets["test"].select(test_random_indices)
+    random_val_indices = random.sample(list(range(len(raw_datasets["validation"]))), 3000)
+    val_subset = raw_datasets["validation"].select(random_val_indices)
+    random_test_indices = random.sample(list(range(len(raw_datasets["test"]))), 3000)
+    test_subset = raw_datasets["test"].select(random_test_indices)
     if "validation" in raw_datasets:
         raw_datasets["validation"] = deepcopy(val_subset)
     if "test" in raw_datasets:
@@ -69,21 +69,21 @@ if torch.cuda.is_available:
 
 model_name = 'google/pegasus-xsum'
 tokenizer_name = 'google/pegasus-xsum' #'google/pegasus-cnn_dailymail'
-seq_len = 256
+seq_len = 512
 batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
 num_train_epochs = 2
 lr_scheduler_type = "linear"
 num_warmup_steps = 0
-eval_every_steps = 30000
+eval_every_steps = 10000
 k = int(seq_len * 0.3)
 accum_iter = 4
 #out_dim = 4096
 
 # Flag to use smaller sample
 debug = False
-smallEval = True
+
 
 ##BELOW IS NOT USED ANYMORE - CAN BE USED TO INVESTIGATE FREEZING THE MODEL IF WE HAVE TIME
 class PegasusForSummarization(nn.Module):
@@ -140,7 +140,8 @@ def main():
     # Make a small dataset for proof of concept
     if debug:
         raw_datasets = sample_small_debug_dataset(raw_datasets)
-    elif smallEval:
+
+    if smallEval:
         raw_datasets = sample_small_eval_dataset(raw_datasets)
 
     ## TOKENIZER
@@ -247,7 +248,8 @@ def main():
             if ((batch_index + 1) % accum_iter == 0) or (batch_index + 1 == len(train_dataloader)):
                 optimizer.step()
                 optimizer.zero_grad()
-                lr_scheduler.step()
+
+            lr_scheduler.step()
 
             progress_bar.update(1)
             global_step += 1
@@ -267,13 +269,11 @@ def main():
 
                 generations = []
                 eval_labels = []
-                eval_progress_bar = tqdm(range(len(eval_dataloader)))
                 for batch in eval_dataloader:
                     eval_input_ids = batch["input_ids"].to(device)
                     eval_labels.append(batch["labels"].to(device))
                     encoded_summary = model.generate(eval_input_ids)
                     generations.append(encoded_summary)
-                    eval_progress_bar.update(1)
 
                 rouge_score = rouge.compute(predictions=generations, references=eval_labels)
 

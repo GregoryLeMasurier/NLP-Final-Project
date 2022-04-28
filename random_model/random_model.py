@@ -54,7 +54,7 @@ rouge = datasets.load_metric("rouge")
 
 cpu_only = False
 
-dataset_name = 'cnn_dailymail'
+dataset_name = 'ccdv/cnn_dailymail'
 dataset_version = '3.0.0'
 wandb_project = "PegasusSummarization"
 output_dir = "output_dir/"
@@ -68,7 +68,7 @@ if torch.cuda.is_available:
 model_name = 'google/pegasus-xsum'
 tokenizer_name = 'google/pegasus-xsum' #'google/pegasus-cnn_dailymail'
 seq_len = 512
-batch_size = 8
+batch_size = 4
 learning_rate = 5e-5
 weight_decay = 0.0
 num_train_epochs = 2
@@ -76,14 +76,16 @@ lr_scheduler_type = "linear"
 num_warmup_steps = 0
 eval_every_steps = 30000
 k = int(seq_len * 0.3)
-accum_iter = 4
+accum_iter = 8
 #out_dim = 4096
 
 # Flag to use smaller sample
 debug = False
-smallEval = True
+smallEval = False
 
 def main():
+    torch.cuda.empty_cache()
+
     logger.info(f"Starting tokenizer training")
 
     logger.info(f"Loading dataset")
@@ -93,6 +95,8 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     raw_datasets = load_dataset(dataset_name, dataset_version)
+
+    print(raw_datasets)
 
     # Make a small dataset for proof of concept
     if debug:
@@ -104,6 +108,7 @@ def main():
     tokenizer = PegasusTokenizer.from_pretrained(tokenizer_name)
     ## RANDOM MODEL
     config = PegasusConfig(
+        use_cache=False,
         max_position_embeddings=seq_len,
         vocab_size=tokenizer.vocab_size
     )

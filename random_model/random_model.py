@@ -54,7 +54,7 @@ rouge = datasets.load_metric("rouge")
 
 cpu_only = False
 
-dataset_name = 'ccdv/cnn_dailymail'
+dataset_name = 'cnn_dailymail'
 dataset_version = '3.0.0'
 wandb_project = "PegasusSummarization"
 output_dir = "output_dir/"
@@ -68,7 +68,7 @@ if torch.cuda.is_available:
 model_name = 'google/pegasus-xsum'
 tokenizer_name = 'google/pegasus-xsum' #'google/pegasus-cnn_dailymail'
 seq_len = 512
-batch_size = 4
+batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
 num_train_epochs = 2
@@ -76,7 +76,7 @@ lr_scheduler_type = "linear"
 num_warmup_steps = 0
 eval_every_steps = 30000
 k = int(seq_len * 0.3)
-accum_iter = 8
+accum_iter = 4
 #out_dim = 4096
 
 # Flag to use smaller sample

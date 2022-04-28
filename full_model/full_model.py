@@ -20,6 +20,8 @@ from packaging import version
 from tqdm.auto import tqdm
 from copy import deepcopy
 import logging
+import bitsandbytes as bnb
+
 
 logger = logging.getLogger("Summarization")
 logging.basicConfig(
@@ -196,7 +198,7 @@ def main():
         batch_size=batch_size
     )
 
-    optimizer = torch.optim.AdamW(
+    optimizer = bnb.optim.Adam8bit(
         model.parameters(),
         lr=learning_rate,
         weight_decay=weight_decay,
@@ -276,9 +278,9 @@ def main():
 
                 metric = {}
                 for rouge_type in rouge_score:
-                    metric['eval/' + rouge_type + "/precision"] = rouge_score[rouge_type][0][0]
-                    metric['eval/' + rouge_type + "/recall"] = rouge_score[rouge_type][0][1]
-                    metric['eval/' + rouge_type + "/f1-score"] = rouge_score[rouge_type][0][2]
+                    metric['eval/' + rouge_type + "/precision"] = rouge_score[rouge_type][1][0]
+                    metric['eval/' + rouge_type + "/recall"] = rouge_score[rouge_type][1][1]
+                    metric['eval/' + rouge_type + "/f1-score"] = rouge_score[rouge_type][1][2]
 
                 wandb.log(metric, step=global_step)
 

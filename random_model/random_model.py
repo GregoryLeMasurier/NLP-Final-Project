@@ -20,6 +20,7 @@ from packaging import version
 from tqdm.auto import tqdm
 from copy import deepcopy
 import logging
+import bitsandbytes as bnb
 
 logger = logging.getLogger("Summarization")
 logging.basicConfig(
@@ -36,6 +37,14 @@ def sample_small_debug_dataset(raw_datasets):
         raw_datasets["validation"] = deepcopy(subset)
     if "test" in raw_datasets:
         raw_datasets["test"] = deepcopy(subset)
+    return raw_datasets
+
+def sample_small_eval_dataset(raw_datasets):
+    val_random_indices = random.sample(list(range(len(raw_datasets["validation"]))), 3000)
+    val_subset = raw_datasets["validation"].select(val_random_indices)
+    if "validation" in raw_datasets:
+        raw_datasets["validation"] = deepcopy(val_subset)
+   
     return raw_datasets
 
 datasets.utils.logging.set_verbosity_warning()
@@ -62,24 +71,24 @@ seq_len = 512
 batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
-num_train_epochs = 1
+num_train_epochs = 2
 lr_scheduler_type = "linear"
 num_warmup_steps = 0
-eval_every_steps = 10000
+eval_every_steps = 30000
 k = int(seq_len * 0.3)
 accum_iter = 4
 #out_dim = 4096
 
 # Flag to use smaller sample
 debug = False
-
+smallEval = True
 
 def main():
     logger.info(f"Starting tokenizer training")
 
     logger.info(f"Loading dataset")
 
-    wandb.init(project=wandb_project) #Skipping config for now - will add back later
+    run = wandb.init(project=wandb_project) #Skipping config for now - will add back later
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -88,6 +97,8 @@ def main():
     # Make a small dataset for proof of concept
     if debug:
         raw_datasets = sample_small_debug_dataset(raw_datasets)
+    elif smallEval:
+        raw_datasets = sample_small_eval_dataset(raw_datasets)
 
     ## TOKENIZER
     tokenizer = PegasusTokenizer.from_pretrained(tokenizer_name)
@@ -120,12 +131,12 @@ def main():
     test_dataset = tokenized_datasets["test"]
 
 
-    #for index in random.sample(range(len(train_dataset)), 2):
-        #logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
-        #logger.info(f"Sample {index} of the training set input ids: {train_dataset[index]['input_ids']}.")
-        #logger.info(f"Decoded input_ids: {tokenizer.decode(train_dataset[index]['input_ids'])}")
-        #logger.info(f"Decoded labels: {tokenizer.decode(train_dataset[index]['labels'])}")
-        #logger.info("\n")
+    for index in random.sample(range(len(train_dataset)), 2):
+        logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+        logger.info(f"Sample {index} of the training set input ids: {train_dataset[index]['input_ids']}.")
+        logger.info(f"Decoded input_ids: {tokenizer.decode(train_dataset[index]['input_ids'])}")
+        logger.info(f"Decoded labels: {tokenizer.decode(train_dataset[index]['labels'])}")
+        logger.info("\n")
 
     collator = transformers.DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, max_length=seq_len, padding='max_length', label_pad_token_id=0)
 
@@ -142,12 +153,7 @@ def main():
         batch_size=batch_size
     )
 
-    test_dataloader = DataLoader(
-        test_dataset,
-        collate_fn=collator,
-        batch_size=batch_size
-    )
-    optimizer = torch.optim.AdamW(
+    optimizer = bnb.optim.Adam8bit(
         model.parameters(),
         lr=learning_rate,
         weight_decay=weight_decay,
@@ -172,35 +178,80 @@ def main():
     #batch = next(iter(train_dataloader))
 
     global_step = 0
-    model.eval()
     for epoch in range(num_train_epochs):
+        model.train()
         batch_index = 0
-        global_step += 1
-        if (global_step % eval_every_steps == 0) or (global_step >= max_train_steps):
-            generations = []
-            eval_labels = []
-            for batch in eval_dataloader:
-                eval_input_ids = batch["input_ids"].to(device)
-                eval_labels.append(batch["labels"].to(device))
-                encoded_summary = model.generate(eval_input_ids)
-                generations.append(encoded_summary)
+        for batch in train_dataloader:
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            labels = batch["labels"].to(device)
+            out = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels
+            )
 
-            rouge_score = rouge.compute(predictions=generations, references=eval_labels)
+            loss = out["loss"]
+            logits = out["logits"]
+            res = torch.topk(logits, k=k)
+            values = res[0]
 
-            metric = {}
-            for rouge_type in rouge_score:
-                metric['eval/' + rouge_type + "/precision"] = rouge_score[rouge_type][0][0]
-                metric['eval/' + rouge_type + "/recall"] = rouge_score[rouge_type][0][1]
-                metric['eval/' + rouge_type + "/f1-score"] = rouge_score[rouge_type][0][2]
+            loss.backward()
 
-            wandb.log(metric, step=global_step)
+            if ((batch_index + 1) % accum_iter == 0) or (batch_index + 1 == len(train_dataloader)):
+                optimizer.step()
+                optimizer.zero_grad()
+                lr_scheduler.step()
 
-            logger.info("Saving model checkpoint to %s", output_dir)
-            model.save_pretrained(output_dir)
+            progress_bar.update(1)
+            global_step += 1
+            batch_index += 1
 
-            model.train()
-        if global_step >= max_train_steps:
-            break
+            wandb.log(
+                {
+                    "train_loss": loss,
+                    "learning_rate": optimizer.param_groups[0]["lr"],
+                    "epoch": epoch,
+                },
+                step=global_step,
+            )
+
+            if (global_step % eval_every_steps == 0) or (global_step >= max_train_steps):
+                model.eval()
+
+                generations = []
+                eval_labels = []
+                eval_progress_bar = tqdm(range(len(eval_dataloader)))
+                for batch in eval_dataloader:
+                    eval_input_ids = batch["input_ids"].to(device)
+                    eval_labels.append(batch["labels"].to(device))
+                    encoded_summary = model.generate(eval_input_ids)
+                    generations.append(encoded_summary)
+                    eval_progress_bar.update(1)
+
+                rouge_score = rouge.compute(predictions=generations, references=eval_labels)
+
+                metric = {}
+                for rouge_type in rouge_score:
+                    metric['eval/' + rouge_type + "/precision"] = rouge_score[rouge_type][1][0]
+                    metric['eval/' + rouge_type + "/recall"] = rouge_score[rouge_type][1][1]
+                    metric['eval/' + rouge_type + "/f1-score"] = rouge_score[rouge_type][1][2]
+
+                wandb.log(metric, step=global_step)
+
+                logger.info("Saving model checkpoint to %s", output_dir)
+                model.save_pretrained(output_dir)
+
+                model.train()
+
+            if global_step >= max_train_steps:
+                break
+
+    test_dataloader = DataLoader(
+        test_dataset,
+        collate_fn=collator,
+        batch_size=batch_size
+    )
 
     summaries = []
     test_labels = []
@@ -211,10 +262,9 @@ def main():
         summaries.append(test_encoded_summary)
         decoded_summaries = tokenizer.batch_decode(test_encoded_summary, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         print("Summary: " + str(decoded_summaries))
+    run.finish()  # stop wandb run
 
 if __name__ == "__main__" :
     if version.parse(datasets.__version__) < version.parse("1.18.0"):
         raise RuntimeError("This script requires Datasets 1.18.0 or higher. Please update via pip install -U datasets.")
     main()
-
-

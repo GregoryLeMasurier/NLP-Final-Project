@@ -71,7 +71,7 @@ seq_len = 512
 batch_size = 8
 learning_rate = 5e-5
 weight_decay = 0.0
-num_train_epochs = 2
+num_train_epochs = 3
 lr_scheduler_type = "linear"
 num_warmup_steps = 0
 eval_every_steps = 30000
@@ -81,7 +81,7 @@ accum_iter = 4
 
 # Flag to use smaller sample
 debug = False
-smallEval = False
+smallEval = True
 
 def main():
     torch.cuda.empty_cache()
@@ -260,6 +260,8 @@ def main():
 
     summaries = []
     test_labels = []
+    test_progress_bar = tqdm(range(len(test_dataloader)))
+
     for batch in test_dataloader:
         test_input_ids = batch["input_ids"].to(device)
         test_labels.append(batch["labels"].to(device))
@@ -267,6 +269,18 @@ def main():
         summaries.append(test_encoded_summary)
         decoded_summaries = tokenizer.batch_decode(test_encoded_summary, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         print("Summary: " + str(decoded_summaries))
+        test_progress_bar.update(1)
+
+    rouge_score = rouge.compute(predictions=summaries, references=test_labels)
+
+    metric = {}
+    for rouge_type in rouge_score:
+        metric['test/' + rouge_type + "/precision"] = rouge_score[rouge_type][1][0]
+        metric['test/' + rouge_type + "/recall"] = rouge_score[rouge_type][1][1]
+        metric['test/' + rouge_type + "/f1-score"] = rouge_score[rouge_type][1][2]
+
+    wandb.log(metric, step=global_step)
+
     run.finish()  # stop wandb run
 
 if __name__ == "__main__" :

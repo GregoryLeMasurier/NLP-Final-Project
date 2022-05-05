@@ -1,0 +1,6 @@
+python -m pip install jupyterlab torch transformers datasets scikit-learn ipywidgets rouge-score nltk sentencepiece numba gradio
+conda install -c anaconda cudatoolkit  
+
+conda list | grep cudatoolkit  
+# Use the version number from the above to replace ###, for example, we installed: pip install bitsandbytes-cuda113  
+    pip install bitsandbytes-cuda###

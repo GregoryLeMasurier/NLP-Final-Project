@@ -1,3 +1,5 @@
+*.json
+*.bin
 **/wandb/**
 **/output_dir/**
 
